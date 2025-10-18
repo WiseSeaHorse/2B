@@ -1,221 +1,212 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+import numpy as np
 
-st.set_page_config(page_title="Comparador de Planilhas", layout="wide")
-st.title("Comparador de Planilhas - Sistema vs B3")
+st.set_page_config(page_title="Verificador de Movimentações", layout="wide")
+st.title("Verificador de Movimentações - Sistema vs B3")
 
-# Feriados fixos
-feriados = ['01-01', '21-04', '01-05', '07-09', '12-10', '02-11', '15-11', '25-12']
+def calcular_movimentacao(df, col_inicial, col_atual, nome_sistema):
+    """Calcula movimentação entre colunas"""
+    df_calc = df.copy()
+    df_calc[f'MOVIMENTAÇÃO_{nome_sistema}'] = df_calc[col_atual] - df_calc[col_inicial]
+    return df_calc
 
-def carregar_planilha(uploader, nome):
-    try:
-        if uploader is not None:
-            df = pd.read_excel(uploader)
-            st.success(f"{nome}: {df.shape[0]} linhas, {df.shape[1]} colunas")
-            return df
-        return None
-    except Exception as e:
-        st.error(f"Erro em {nome}: {str(e)}")
-        return None
-
-def verificar_data_util(data):
-    if pd.isna(data):
-        return False, "Data inválida"
+def comparar_movimentacoes(sistema_df, b3_df, col_id, col_ini_sis, col_atual_sis, col_ini_b3, col_atual_b3):
+    """Compara movimentações entre Sistema e B3"""
     
-    try:
-        if isinstance(data, str):
-            data = pd.to_datetime(data, errors='coerce')
-            if pd.isna(data):
-                return False, "Data inválida"
-        
-        if data.weekday() >= 5:
-            return False, "Final de semana"
-        
-        data_str = data.strftime('%d-%m')
-        if data_str in feriados:
-            return False, "Feriado"
-        
-        return True, "Dia útil"
-    except:
-        return False, "Erro data"
-
-def analisar_datas(sistema, b3, col_data_sis, col_data_b3):
-    resultados = []
+    resultados = {
+        'mov_sistema_sem_b3': [],
+        'mov_b3_sem_sistema': [], 
+        'mov_conciliadas': [],
+        'estatisticas': {}
+    }
     
-    for idx, (data_sis, data_b3) in enumerate(zip(sistema[col_data_sis], b3[col_data_b3])):
-        util_sis, motivo_sis = verificar_data_util(data_sis)
-        util_b3, motivo_b3 = verificar_data_util(data_b3)
-        
-        status = "OK"
-        if not util_sis and not util_b3:
-            status = "Ambas não úteis"
-        elif not util_sis:
-            status = f"Sistema: {motivo_sis}"
-        elif not util_b3:
-            status = f"B3: {motivo_b3}"
-        
-        resultados.append({
-            'ID': idx,
-            'Data_Sistema': data_sis,
-            'Data_B3': data_b3,
-            'Status': status
-        })
+    # Calcular movimentações
+    sistema_com_mov = calcular_movimentacao(sistema_df, col_ini_sis, col_atual_sis, 'SISTEMA')
+    b3_com_mov = calcular_movimentacao(b3_df, col_ini_b3, col_atual_b3, 'B3')
     
-    return pd.DataFrame(resultados)
-
-def comparar_colunas(sistema, b3, col_sis, col_b3):
-    try:
-        dados_sis = sistema[col_sis].dropna().reset_index(drop=True)
-        dados_b3 = b3[col_b3].dropna().reset_index(drop=True)
+    # Filtrar apenas registros com movimentação
+    sistema_com_movimento = sistema_com_mov[sistema_com_mov['MOVIMENTAÇÃO_SISTEMA'] != 0].copy()
+    b3_com_movimento = b3_com_mov[b3_com_mov['MOVIMENTAÇÃO_B3'] != 0].copy()
+    
+    # Verificar movimentações do Sistema na B3
+    for _, linha_sis in sistema_com_movimento.iterrows():
+        mov_sis = linha_sis['MOVIMENTAÇÃO_SISTEMA']
+        id_sis = linha_sis[col_id]
         
-        max_len = max(len(dados_sis), len(dados_b3))
-        comparacao = pd.DataFrame({
-            f'{col_sis} (Sistema)': dados_sis.reindex(range(max_len)),
-            f'{col_b3} (B3)': dados_b3.reindex(range(max_len)),
-            'Status': ['Igual' if str(a) == str(b) else 'Diferente' 
-                      for a, b in zip(dados_sis.reindex(range(max_len)), 
-                                    dados_b3.reindex(range(max_len)))]
-        })
+        # Buscar correspondente na B3
+        correspondente_b3 = b3_com_movimento[
+            (b3_com_movimento[col_id] == id_sis) & 
+            (abs(b3_com_movimento['MOVIMENTAÇÃO_B3'] - mov_sis) < 0.01)
+        ]
         
-        iguais = (comparacao['Status'] == 'Igual').sum()
-        return comparacao, iguais, len(comparacao)
-    except Exception as e:
-        st.error(f"Erro: {str(e)}")
-        return None, 0, 0
+        if len(correspondente_b3) == 0:
+            resultados['mov_sistema_sem_b3'].append({
+                'ID': id_sis,
+                'MOVIMENTAÇÃO_SISTEMA': mov_sis,
+                'QTD_INICIAL_SIS': linha_sis[col_ini_sis],
+                'QTD_ATUAL_SIS': linha_sis[col_atual_sis],
+                'STATUS': 'Não encontrada na B3'
+            })
+        else:
+            linha_b3 = correspondente_b3.iloc[0]
+            resultados['mov_conciliadas'].append({
+                'ID': id_sis,
+                'MOVIMENTAÇÃO_SISTEMA': mov_sis,
+                'MOVIMENTAÇÃO_B3': linha_b3['MOVIMENTAÇÃO_B3'],
+                'QTD_INICIAL_SIS': linha_sis[col_ini_sis],
+                'QTD_ATUAL_SIS': linha_sis[col_atual_sis],
+                'QTD_INICIAL_B3': linha_b3[col_ini_b3],
+                'QTD_ATUAL_B3': linha_b3[col_atual_b3],
+                'STATUS': 'Conciliada'
+            })
+    
+    # Verificar movimentações da B3 no Sistema
+    for _, linha_b3 in b3_com_movimento.iterrows():
+        mov_b3 = linha_b3['MOVIMENTAÇÃO_B3']
+        id_b3 = linha_b3[col_id]
+        
+        correspondente_sis = sistema_com_movimento[
+            (sistema_com_movimento[col_id] == id_b3) & 
+            (abs(sistema_com_movimento['MOVIMENTAÇÃO_SISTEMA'] - mov_b3) < 0.01)
+        ]
+        
+        if len(correspondente_sis) == 0:
+            resultados['mov_b3_sem_sistema'].append({
+                'ID': id_b3,
+                'MOVIMENTAÇÃO_B3': mov_b3,
+                'QTD_INICIAL_B3': linha_b3[col_ini_b3],
+                'QTD_ATUAL_B3': linha_b3[col_atual_b3],
+                'STATUS': 'Não encontrada no Sistema'
+            })
+    
+    # Estatísticas
+    total_mov_sistema = len(sistema_com_movimento)
+    total_mov_b3 = len(b3_com_movimento)
+    mov_conciliadas = len(resultados['mov_conciliadas'])
+    
+    resultados['estatisticas'] = {
+        'mov_sistema': total_mov_sistema,
+        'mov_b3': total_mov_b3,
+        'conciliadas': mov_conciliadas,
+        'sistema_sem_b3': len(resultados['mov_sistema_sem_b3']),
+        'b3_sem_sistema': len(resultados['mov_b3_sem_sistema'])
+    }
+    
+    return resultados
 
-# Upload das planilhas
-st.header("Upload das Planilhas")
+# Interface principal
+st.header("Upload dos Arquivos")
+
 col1, col2 = st.columns(2)
 
 with col1:
-    sis_upload = st.file_uploader("Planilha do Sistema", type=['xlsx', 'xls'])
+    upload_sistema = st.file_uploader("Planilha do Sistema", type=['xlsx', 'csv'])
 
 with col2:
-    b3_upload = st.file_uploader("Planilha da B3", type=['xlsx', 'xls'])
+    upload_b3 = st.file_uploader("Planilha da B3", type=['xlsx', 'csv'])
 
-sistema = carregar_planilha(sis_upload, "Sistema")
-b3 = carregar_planilha(b3_upload, "B3")
-
-if sistema is not None and b3 is not None:
+if upload_sistema and upload_b3:
+    # Carregar dados
+    sistema_df = pd.read_excel(upload_sistema) if upload_sistema.name.endswith('.xlsx') else pd.read_csv(upload_sistema)
+    b3_df = pd.read_excel(upload_b3) if upload_b3.name.endswith('.xlsx') else pd.read_csv(upload_b3)
     
-    # Análise de datas
-    st.header("Análise de Datas")
+    st.header("Configurar Colunas")
     
     col1, col2 = st.columns(2)
-    with col1:
-        col_data_sis = st.selectbox("Data Sistema:", sistema.columns, key="data_sis")
-    with col2:
-        col_data_b3 = st.selectbox("Data B3:", b3.columns, key="data_b3")
     
-    if st.button("Verificar Datas"):
-        try:
-            df_datas = analisar_datas(sistema, b3, col_data_sis, col_data_b3)
-            st.dataframe(df_datas, height=400)
-            
-            problemas = len(df_datas[df_datas['Status'] != 'OK'])
-            st.write(f"Registros com problemas: {problemas} de {len(df_datas)}")
-            
-            csv_datas = df_datas.to_csv(index=False)
-            st.download_button("Baixar Análise Datas", data=csv_datas, 
-                             file_name="analise_datas.csv")
-            
-        except Exception as e:
-            st.error(f"Erro: {str(e)}")
-
-    # Subtração entre quantidades
-    st.header("Subtração entre Quantidades")
-    
-    col1, col2 = st.columns(2)
     with col1:
-        qtd_ini_sis = st.selectbox("Qtd Inicial Sistema:", sistema.columns, key="ini_sis")
-        qtd_atual_sis = st.selectbox("Qtd Atual Sistema:", sistema.columns, key="atual_sis")
+        st.subheader("Sistema")
+        col_id_sis = st.selectbox("Coluna de Identificação:", sistema_df.columns, key="id_sis")
+        col_ini_sis = st.selectbox("Quantidade Inicial:", sistema_df.columns, key="ini_sis")
+        col_atual_sis = st.selectbox("Quantidade Atual:", sistema_df.columns, key="atual_sis")
     
     with col2:
-        qtd_ini_b3 = st.selectbox("Qtd Inicial B3:", b3.columns, key="ini_b3")
-        qtd_atual_b3 = st.selectbox("Qtd Atual B3:", b3.columns, key="atual_b3")
+        st.subheader("B3")
+        col_id_b3 = st.selectbox("Coluna de Identificação:", b3_df.columns, key="id_b3")
+        col_ini_b3 = st.selectbox("Quantidade Inicial:", b3_df.columns, key="ini_b3")
+        col_atual_b3 = st.selectbox("Quantidade Atual:", b3_df.columns, key="atual_b3")
     
-    if st.button("Calcular Subtração"):
-        try:
-            sis_calc = sistema.copy()
-            sis_calc['DIFERENCA_SISTEMA'] = sis_calc[qtd_atual_sis] - sis_calc[qtd_ini_sis]
+    if st.button("🔍 Verificar Movimentações", type="primary", use_container_width=True):
+        with st.spinner("Analisando movimentações..."):
+            resultados = comparar_movimentacoes(
+                sistema_df, b3_df, col_id_sis, col_ini_sis, col_atual_sis, col_ini_b3, col_atual_b3
+            )
             
-            b3_calc = b3.copy()
-            b3_calc['DIFERENCA_B3'] = b3_calc[qtd_atual_b3] - b3_calc[qtd_ini_b3]
+            # Resultados
+            st.header("Resultados")
             
-            col1, col2 = st.columns(2)
-            with col1:
-                st.write("Sistema")
-                st.dataframe(sis_calc[[qtd_ini_sis, qtd_atual_sis, 'DIFERENCA_SISTEMA']], height=400)
-                st.write(f"Total: {sis_calc['DIFERENCA_SISTEMA'].sum():,.2f}")
+            stats = resultados['estatisticas']
+            col1, col2, col3, col4, col5 = st.columns(5)
             
-            with col2:
-                st.write("B3")
-                st.dataframe(b3_calc[[qtd_ini_b3, qtd_atual_b3, 'DIFERENCA_B3']], height=400)
-                st.write(f"Total: {b3_calc['DIFERENCA_B3'].sum():,.2f}")
+            col1.metric("Sistema", stats['mov_sistema'])
+            col2.metric("B3", stats['mov_b3'])
+            col3.metric("✅ Conciliadas", stats['conciliadas'])
+            col4.metric("❌ Sistema s/B3", stats['sistema_sem_b3'])
+            col5.metric("❌ B3 s/Sistema", stats['b3_sem_sistema'])
             
-            resultado = pd.DataFrame({
-                'ID': sis_calc.index,
-                f'{qtd_ini_sis}_Sistema': sis_calc[qtd_ini_sis],
-                f'{qtd_atual_sis}_Sistema': sis_calc[qtd_atual_sis],
-                'Diferenca_Sistema': sis_calc['DIFERENCA_SISTEMA'],
-                f'{qtd_ini_b3}_B3': b3_calc[qtd_ini_b3],
-                f'{qtd_atual_b3}_B3': b3_calc[qtd_atual_b3],
-                'Diferenca_B3': b3_calc['DIFERENCA_B3']
-            })
+            # Alertas
+            if stats['sistema_sem_b3'] > 0:
+                st.error(f"{stats['sistema_sem_b3']} movimentações do Sistema não encontradas na B3")
             
-            csv = resultado.to_csv(index=False)
-            st.download_button("Baixar Subtração", data=csv, file_name="subtracao.csv")
+            if stats['b3_sem_sistema'] > 0:
+                st.warning(f"{stats['b3_sem_sistema']} movimentações da B3 não encontradas no Sistema")
             
-        except Exception as e:
-            st.error(f"Erro: {str(e)}")
-
-    # Comparação de colunas
-    st.header("Comparação de Colunas")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        col_sis = st.selectbox("Coluna Sistema:", sistema.columns, key="col_sis")
-    with col2:
-        col_b3 = st.selectbox("Coluna B3:", b3.columns, key="col_b3")
-    
-    if st.button("Comparar Colunas"):
-        if col_sis and col_b3:
-            comparacao, iguais, total = comparar_colunas(sistema, b3, col_sis, col_b3)
-            
-            if comparacao is not None:
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Iguais", iguais)
-                col2.metric("Diferentes", total - iguais)
-                col3.metric("Total", total)
+            # Detalhes das divergências
+            if resultados['mov_sistema_sem_b3']:
+                st.subheader("Movimentações do Sistema sem B3")
+                df_problemas = pd.DataFrame(resultados['mov_sistema_sem_b3'])
+                st.dataframe(df_problemas, use_container_width=True)
                 
-                st.dataframe(comparacao, height=400)
-                
-                csv_comp = comparacao.to_csv(index=False)
-                st.download_button("Baixar Comparação", data=csv_comp, 
-                                 file_name=f"comparacao_{col_sis}_{col_b3}.csv")
-
-    # Comparação automática
-    st.header("Comparação Automática")
-    
-    colunas_comuns = [col for col in sistema.columns if col in b3.columns]
-    st.write(f"Colunas comuns: {len(colunas_comuns)}")
-    
-    for coluna in colunas_comuns:
-        if st.button(f"Comparar: {coluna}", key=f"auto_{coluna}"):
-            comparacao, iguais, total = comparar_colunas(sistema, b3, coluna, coluna)
+                st.download_button(
+                    "💾 Baixar Detalhes",
+                    data=df_problemas.to_csv(index=False),
+                    file_name="movimentações_sistema_sem_b3.csv",
+                    key="download_sistema_sem_b3"
+                )
             
-            if comparacao is not None:
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Iguais", iguais)
-                col2.metric("Diferentes", total - iguais)
-                col3.metric("Total", total)
+            if resultados['mov_b3_sem_sistema']:
+                st.subheader("Movimentações da B3 sem Sistema")
+                df_problemas = pd.DataFrame(resultados['mov_b3_sem_sistema'])
+                st.dataframe(df_problemas, use_container_width=True)
                 
-                st.dataframe(comparacao.head(15), height=400)
+                st.download_button(
+                    "💾 Baixar Detalhes",
+                    data=df_problemas.to_csv(index=False),
+                    file_name="movimentações_b3_sem_sistema.csv",
+                    key="download_b3_sem_sistema"
+                )
+            
+            # Movimentações conciliadas - removi o checkbox
+            if resultados['mov_conciliadas']:
+                st.subheader("Movimentações Conciliadas")
+                st.success(f"{stats['conciliadas']} movimentações conciliadas com sucesso!")
                 
-                csv_auto = comparacao.to_csv(index=False)
-                st.download_button("Baixar Comparação", data=csv_auto,
-                                 file_name=f"comparacao_{coluna}.csv")
+                df_conciliadas = pd.DataFrame(resultados['mov_conciliadas'])
+                st.dataframe(df_conciliadas, use_container_width=True)
+                
+                st.download_button(
+                    "💾 Baixar Movimentações Conciliadas",
+                    data=df_conciliadas.to_csv(index=False),
+                    file_name="movimentações_conciliadas.csv",
+                    key="download_conciliadas"
+                )
+            else:
+                st.info("Nenhuma movimentação conciliada encontrada")
 
 else:
-    st.info("Faça upload das planilhas para começar")
+    st.info("""
+    👋 **Bem-vindo ao Verificador de Movimentações!**
+    
+    **O que este sistema faz:**
+    - Compara as movimentações de quantidade entre Sistema e B3
+    - Identifica movimentações que existem em um sistema mas não no outro
+    - Ajuda a encontrar erros de registro e sincronização
+    
+    **Como usar:**
+    1. Faça upload das planilhas do Sistema e B3
+    2. Configure quais colunas usar para comparação  
+    3. Clique em "Verificar Movimentações"
+    4. Analise os resultados e baixe os relatórios
+    
+    """)
