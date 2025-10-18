@@ -67,11 +67,3 @@ Aplicativo Streamlit para comparar planilhas do Sistema vs B3, verificando dados
 3. **Cálculo** → Subtrai quantidades iniciais/atuais  
 4. **Comparação** → Analisa colunas específicas
 5. **Download** → Exporta resultados em CSV
-
-### **Funcionalidades Chave**
-
-- **Verificação de feriados** e finais de semana
-- **Cálculo automático** de diferenças
-- **Comparação linha a linha** entre sistemas
-- **Exportação completa** em CSV
-- **Tratamento robusto** de erros
