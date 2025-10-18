@@ -1,69 +1,68 @@
-## **Explicação do Código - Comparador de Planilhas**
+# Verificador de Movimentações - Sistema vs B3
 
-### **Visão Geral**
-Aplicativo Streamlit para comparar planilhas do Sistema vs B3, verificando dados, datas e calculando diferenças.
+Sistema web para comparar automaticamente movimentações entre sistema interno e B3. Detecta divergências onde registros existem em um sistema mas não no outro.
+<img width="1919" height="910" alt="image" src="https://github.com/user-attachments/assets/10512e3a-21fc-4eaf-849c-9ebd79ca3d06" />
+*Interface intuitiva para upload e configuração*
 
-### **Funções Principais**
+## Funcionalidades
 
-#### **1. `carregar_planilha(uploader, nome)`**
-- **Função**: Carrega arquivos Excel
-- **Entrada**: Arquivo uploader e nome para identificação
-- **Saída**: DataFrame pandas ou None em caso de erro
-- **Propósito**: Valida e carrega as planilhas com tratamento de erro
+- ** Comparação Automática** - Cruza movimentações por ID
+- ** Dashboard Visual** - Métricas em tempo real
+- ** Exportação CSV** - Download dos resultados
+<img width="1919" height="894" alt="image" src="https://github.com/user-attachments/assets/e081b0ab-fb3c-4690-8fa5-1f99100eaa4b" />
+*Dashboard*
 
-#### **2. `verificar_data_util(data)`**
-- **Função**: Verifica se uma data é dia útil
-- **Verifica**: 
-  - Finais de semana (sábado e domingo)
-  - Feriados nacionais brasileiros
-  - Datas inválidas
-- **Saída**: (True/False, motivo)
+## Como Usar
 
-#### **3. `analisar_datas(sistema, b3, col_data_sis, col_data_b3)`**
-- **Função**: Compara datas entre as duas planilhas
-- **Identifica**: 
-  - Emissões em feriados/finais de semana
-  - Discrepâncias entre sistemas
-- **Saída**: DataFrame com análise de cada registro
+### 1. Upload das Planilhas
+```python
+# Sistema precisa ter:
+# - Coluna de ID (código do cliente)
+# - Colunas de quantidade inicial e atual
+```
+### 2. Configurar Colunas
+Selecione as colunas para comparação em cada sistema.
+<img width="1916" height="899" alt="image" src="https://github.com/user-attachments/assets/a13323b3-e550-407a-95aa-fb1786255b21" />
+*Seleção intuitiva das colunas*
 
-#### **4. `comparar_colunas(sistema, b3, col_sis, col_b3)`**
-- **Função**: Compara valores de colunas correspondentes
-- **Processo**: 
-  - Remove valores vazios
-  - Alinha por índice
-  - Marca como "Igual" ou "Diferente"
-- **Saída**: DataFrame comparativo com estatísticas
+### 3. Analisar Resultados
+O sistema gera três categorias:
 
-### **Seções do Aplicativo**
+| Tipo | Descrição | Gravidade |
+|------|-----------|-----------|
+| Conciliadas | Movimentações em ambos sistemas | - |
+| Sistema s/B3 | Só existe no sistema interno | Alta |
+| B3 s/Sistema | Só existe na B3 | Alta |
 
-#### **1. Upload de Planilhas**
-- Interface para carregar Sistema.xlsx e B3.xlsx
-- Validação de formato e tratamento de erro
+<img width="1777" height="554" alt="image" src="https://github.com/user-attachments/assets/d1ae014d-d722-4f84-82c1-26dd9225012c" />
+<img width="1745" height="381" alt="image" src="https://github.com/user-attachments/assets/b1fea7c5-e04a-4574-9cf1-e77680c0ed16" />
+*Tabelas detalhadas com opção de download*
 
-#### **2. Análise de Datas**
-- Seleciona colunas de data de cada planilha
-- Verifica se emissões foram em dias úteis
-- Identifica possíveis causas de divergência
+## 🔧 Funções Principais
 
-#### **3. Subtração entre Quantidades**
-- Calcula diferença entre quantidade inicial e atual
-- Mostra resultados completos de ambos sistemas
-- Gera CSV com totais e diferenças
+### `calcular_movimentacao()`
+Calcula diferença entre quantidades iniciais e atuais.
 
-#### **4. Comparação de Colunas**
-- Compara colunas específicas entre sistemas
-- Mostra estatísticas de correspondência
-- Permite download dos resultados
+```python
+# Entrada: DataFrame com colunas de quantidade
+# Saída: DataFrame com coluna de movimentação
+movimentação = quantidade_atual - quantidade_inicial
+```
 
-#### **5. Comparação Automática**
-- Detecta colunas com mesmo nome automaticamente
-- Botão individual para cada coluna comum
-- Download específico por coluna
+### `comparar_movimentacoes()`
+Função principal que executa toda a comparação.
 
-### **Fluxo de Uso**
+**Fluxo:**
+1. Calcula movimentações em cada sistema
+2. Filtra registros com movimentação ≠ 0
+3. Cruza dados por ID
+4. Classifica resultados
 
-1. **Upload** → Carrega Sistema.xlsx e B3.xlsx
-2. **Análise** → Verifica datas problemáticas
-3. **Cálculo** → Subtrai quantidades iniciais/atuais  
-4. **Comparação** → Analisa colunas específicas
-5. **Download** → Exporta resultados em CSV
+
+## Contribuição
+
+Contribuições são bem-vindas!
+
+## Licença
+
+MIT License
