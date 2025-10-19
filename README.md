@@ -1,16 +1,16 @@
-# Verificador de Movimentações - Sistema vs B3
+# Movimentações - Sistema vs B3
 
 Sistema web para comparar automaticamente movimentações entre sistema interno e B3. Detecta divergências onde registros existem em um sistema mas não no outro.
 <img width="1919" height="910" alt="image" src="https://github.com/user-attachments/assets/10512e3a-21fc-4eaf-849c-9ebd79ca3d06" />
-* Interface intuitiva para upload e configuração *
+ Interface intuitiva para upload e configuração 
 
 ## Funcionalidades
 
-- ** Comparação Automática** - Cruza movimentações por ID
-- ** Dashboard Visual** - Métricas em tempo real
-- ** Exportação CSV** - Download dos resultados
+- Comparação Automática - Cruza movimentações por ID
+- Dashboard Visual - Métricas em tempo real
+- Exportação CSV - Download dos resultados
 <img width="1919" height="894" alt="image" src="https://github.com/user-attachments/assets/e081b0ab-fb3c-4690-8fa5-1f99100eaa4b" />
-* Dashboard *
+Dashboard 
 
 ## Como Usar
 
@@ -23,7 +23,7 @@ Sistema web para comparar automaticamente movimentações entre sistema interno 
 ### 2. Configurar Colunas
 Selecione as colunas para comparação em cada sistema.
 <img width="1916" height="899" alt="image" src="https://github.com/user-attachments/assets/a13323b3-e550-407a-95aa-fb1786255b21" />
-* Seleção intuitiva das colunas *
+Seleção intuitiva das colunas
 
 ### 3. Analisar Resultados
 O sistema gera três categorias:
@@ -36,7 +36,7 @@ O sistema gera três categorias:
 
 <img width="1777" height="554" alt="image" src="https://github.com/user-attachments/assets/d1ae014d-d722-4f84-82c1-26dd9225012c" />
 <img width="1745" height="381" alt="image" src="https://github.com/user-attachments/assets/b1fea7c5-e04a-4574-9cf1-e77680c0ed16" />
-* Tabelas detalhadas com opção de download *
+Tabelas detalhadas com opção de download
 
 ## Funções Principais
 
