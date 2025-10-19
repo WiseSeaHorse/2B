@@ -17,7 +17,7 @@ Dashboard
 ### 1. Upload das Planilhas
 ```python
 # Sistema precisa ter:
-# - Coluna de ID (código do cliente)
+# - Coluna de ID (código)
 # - Colunas de quantidade inicial e atual
 ```
 ### 2. Configurar Colunas
