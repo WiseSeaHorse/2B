@@ -57,12 +57,3 @@ Função principal que executa toda a comparação.
 2. Filtra registros com movimentação ≠ 0
 3. Cruza dados por ID
 4. Classifica resultados
-
-
-## Contribuição
-
-Contribuições são bem-vindas!
-
-## Licença
-
-MIT License
